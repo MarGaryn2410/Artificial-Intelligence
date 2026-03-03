@@ -1,0 +1,73 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "2"   #If you don't put, it cause memory leak error in console
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+
+# Load dataset
+df = pd.read_csv('https://archive.ics.uci.edu/static/public/39/data.csv', delimiter=',')
+
+# Drop the first column (non-numeric identifier)
+df = df.iloc[:, 1:]
+
+# Extract features and labels
+X = np.array(df.iloc[:, :-1])  # Features
+y = np.array(df.iloc[:, -1])   # Labels
+
+# Encode categorical labels into numbers
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(y)
+
+# Standardize features
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+# Apply PCA
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X)
+
+# Set number of clusters, remove comment line to change
+n_clusters = len(np.unique(y)) #which is actually 8
+#n_clusters = 9 
+#n_clusters = 10
+
+# K-Means Clustering (n_clusters kullanıldı!)
+kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+kmeans_clusters = kmeans.fit_predict(X)
+
+# Confusion Matrix-like Table for K-Means Clustering
+conf_matrix_kmeans = pd.crosstab(y, kmeans_clusters, rownames=['Actual'], colnames=['Cluster'])
+print("K-Means Clustering Distribution:")
+print(conf_matrix_kmeans)
+
+# Cluster Statistics in Table Format
+NNs = np.zeros((len(np.unique(y)), n_clusters), dtype=np.int32)
+for t, p in zip(y, kmeans_clusters):
+    p = np.clip(p, 0, n_clusters - 1)  # Ensure index is within range
+    NNs[t, p] += 1 
+
+df_clusters = pd.DataFrame(NNs, index=[f"Class {i}" for i in range(len(np.unique(y)))],
+                           columns=[f"Cluster {i + 1}" for i in range(n_clusters)])
+print("\nCluster Distribution Table:\n")
+print(df_clusters)
+
+# Check number of elements in each cluster
+unique_clusters, cluster_counts = np.unique(kmeans_clusters, return_counts=True)
+print("\nElements in each cluster:", cluster_counts)
+
+# Plot K-Means results
+plt.figure(figsize=(8, 6))
+cmap = plt.get_cmap("rainbow")
+colors = cmap(np.linspace(0, 1, n_clusters))  
+
+for i in range(n_clusters):  
+    plt.scatter(X_pca[kmeans_clusters == i, 0], X_pca[kmeans_clusters == i, 1], 
+                color=colors[i], label=f'Cluster {i + 1}')
+
+plt.legend()
+plt.title(f"K-Means Clustering (n_clusters={n_clusters})")
+plt.show()
