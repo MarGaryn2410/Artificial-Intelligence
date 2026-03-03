@@ -1,0 +1,93 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.decomposition import PCA
+from sklearn.cluster import AgglomerativeClustering
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+# Load dataset
+df = pd.read_csv('https://archive.ics.uci.edu/static/public/39/data.csv', delimiter=',')
+
+# Drop the first column (non-numeric identifier)
+df = df.iloc[:, 1:]
+
+# Extract features and labels
+X = np.array(df.iloc[:, :-1])  # Features
+y = np.array(df.iloc[:, -1])   # Labels
+
+# Encode categorical labels into numbers
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(y)
+
+# Standardize features
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+# Apply PCA
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X)
+
+# Get the number of unique labels
+unique_labels = np.unique(y)
+n_labels = len(unique_labels)
+
+# Agglomerative Clustering with n_clusters=None and distance_threshold set
+
+distance_threshold = 5  
+linkage_method = 'ward'
+
+#different values1
+"""
+distance_threshold = 10  
+linkage_method = 'average'
+"""
+
+#different values2
+"""
+distance_threshold = 10  
+linkage_method = 'ward'
+"""
+
+agglo = AgglomerativeClustering(n_clusters=None, distance_threshold=distance_threshold, linkage=linkage_method)
+agglo_clusters = agglo.fit_predict(X)
+
+# Confusion Matrix-like Table for Agglomerative Clustering
+conf_matrix_agglo = pd.crosstab(y, agglo_clusters, rownames=['Actual'], colnames=['Cluster'])
+print("Agglomerative Clustering Distribution:")
+print(conf_matrix_agglo)
+
+# Cluster Statistics in Table Format
+n_clusters = len(np.unique(agglo_clusters))  # Correctly obtaining the number of clusters
+NNs = np.zeros((n_labels, n_clusters), dtype=np.int32)
+for t, p in zip(y, agglo_clusters):
+    p = np.clip(p, 0, n_clusters - 1)  # Ensure index is within range
+    NNs[t, p] += 1 
+
+print("\nCluster stats:\n", NNs)
+
+df_clusters = pd.DataFrame(NNs, index=[f"Class {i + 1}" for i in range(n_labels)], columns=[f"Cluster {i + 1}" for i in range(n_clusters)])
+print("\n Cluster Distribution Table:\n")
+print(df_clusters)
+
+unique_clusters, cluster_counts = np.unique(agglo_clusters, return_counts=True)
+print("\nElements in each cluster:", cluster_counts)
+
+# Plot Agglomerative results
+plt.figure(figsize=(8, 6))
+cmap = plt.get_cmap("rainbow")
+colors = cmap(np.linspace(0, 1, n_clusters))
+for i in range(n_clusters):
+    plt.scatter(X_pca[agglo_clusters == i, 0], X_pca[agglo_clusters == i, 1], color=colors[i], label=f'Cluster {i + 1}')
+plt.legend()
+plt.title("Agglomerative Clustering")
+plt.show()
+
+# Dendrogram for Agglomerative Clustering
+plt.figure(figsize=(10, 5))
+linkage_matrix = linkage(X, method=linkage_method)
+dendrogram(linkage_matrix)
+plt.title("Dendrogram for Hierarchical Clustering")
+plt.xlabel("Samples")
+plt.ylabel("Distance")
+plt.show()
